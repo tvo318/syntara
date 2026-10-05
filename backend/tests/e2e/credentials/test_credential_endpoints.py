@@ -175,7 +175,9 @@ class TestWorkflowWithValidCredential:
             syntara_api, workflow_name, definition, timeout=30, project_id=first_project_id
         )
 
-        assert execution.status == ExecutionStatus.COMPLETED, f"Unexpected status: {execution.status}"
+        assert execution.status == ExecutionStatus.COMPLETED, (
+            f"Unexpected status: {execution.status}: {execution.error_details}"
+        )
         output = _get_activity_output(execution, "api_call")
         assert output.get("status_code") == 200
         body = output.get("body", {})
@@ -305,7 +307,9 @@ class TestWorkflowWithDisabledCredential:
             syntara_api, workflow_name, definition, timeout=30, project_id=first_project_id
         )
 
-        assert execution.status == ExecutionStatus.COMPLETED, f"Unexpected status after re-enable: {execution.status}"
+        assert execution.status == ExecutionStatus.COMPLETED, (
+            f"Unexpected status after re-enable: {execution.status}: {execution.error_details}"
+        )
         output = _get_activity_output(execution, "api_call")
         assert output.get("status_code") == 200
 
