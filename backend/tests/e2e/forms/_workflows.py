@@ -36,9 +36,25 @@ def producer_prompt_consumer_workflow(
     form_fields: list[dict[str, Any]],
     continue_on_failure: bool = False,
     response_window: int = 600,
+    responder_users: list[str] | None = None,
+    responder_groups: list[str] | None = None,
 ) -> WorkflowDefinition:
-    """Build a trigger, Python producer, form prompt, and downstream consumer."""
+    """Build a trigger, Python producer, form prompt, and downstream consumer.
+
+    Optional responder lists restrict which users or group members may submit
+    the form prompt.
+    """
     payload = json.dumps(producer_output)
+    prompt_parameters: dict[str, Any] = {
+        "message": "Choose an environment",
+        "form_definition": {"fields": form_fields},
+        "response_window": response_window,
+    }
+    if responder_users:
+        prompt_parameters["responder_users"] = responder_users
+    if responder_groups:
+        prompt_parameters["responder_groups"] = responder_groups
+
     nodes: list[dict[str, Any]] = [
         {
             "id": "producer",
@@ -50,11 +66,7 @@ def producer_prompt_consumer_workflow(
             "id": "prompt",
             "name": "Collect Input",
             "type": "form_prompt",
-            "parameters": {
-                "message": "Choose an environment",
-                "form_definition": {"fields": form_fields},
-                "response_window": response_window,
-            },
+            "parameters": prompt_parameters,
             "settings": {"continue_on_failure": continue_on_failure},
         },
         {
@@ -90,6 +102,14 @@ def producer_prompt_consumer_workflow(
             "edges": edges,
         }
     )
+
+
+APPROVAL_REASON_FIELD: dict[str, Any] = {
+    "type": "text",
+    "value_name": "reason",
+    "label": "Reason",
+    "required": True,
+}
 
 
 ENVIRONMENT_RECORDS = [
