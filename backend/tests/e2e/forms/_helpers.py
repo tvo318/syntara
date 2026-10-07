@@ -1,6 +1,7 @@
 """Shared API and workflow helpers for the form-prompt E2E tests."""
 
 import json
+import time
 from collections.abc import Callable, Mapping
 from http import HTTPStatus
 from typing import Any, cast
@@ -145,6 +146,30 @@ def assert_prompt_not_consumed(
     assert activities.get("consumer") is None or activities["consumer"].status != "completed"
 
 
+def wait_for_form_prompt_paused(
+    syntara_api: SyntaraApiRegistry,
+    exec_id: UUID,
+    *,
+    prompt_node_id: str = "prompt",
+    timeout: int = 60,
+) -> ExecutionRead:
+    """Wait until the execution is paused on the form-prompt activity."""
+    for _ in range(timeout):
+        execution = assert_and_get_with_502_skip(syntara_api.executions.get(execution_id=exec_id, include="activities"))
+        activities = {activity.activity_id: activity for activity in (execution.activities or [])}
+        prompt_activity = activities.get(prompt_node_id)
+        if execution.status == ExecutionStatus.PAUSED and prompt_activity is not None:
+            assert prompt_activity.status == "waiting", (
+                f"Expected {prompt_node_id} activity waiting, got {prompt_activity.status}"
+            )
+            return execution
+        if execution.status in TERMINAL_STATUSES:
+            pytest.fail(f"Execution became terminal before {prompt_node_id} paused: {execution.status}")
+        time.sleep(1)
+
+    pytest.fail(f"Execution {exec_id} did not pause on {prompt_node_id} within {timeout}s")
+
+
 def create_form_prompt_execution(
     syntara_api: SyntaraApiRegistry,
     workflow_factory: Callable[[WorkflowCreate], WorkflowRead],
@@ -159,6 +184,7 @@ def create_form_prompt_execution(
     response_window: int = 600,
     responder_users: list[str] | None = None,
     responder_groups: list[str] | None = None,
+    consumer_code: str = 'echo "submitted path executed"',
 ) -> UUID:
     """Create and start a workflow containing a form prompt, returning its execution ID."""
     name = unique_name(workflow_name_prefix)
@@ -174,6 +200,7 @@ def create_form_prompt_execution(
                 response_window=response_window,
                 responder_users=responder_users,
                 responder_groups=responder_groups,
+                consumer_code=consumer_code,
             ),
             project_id=first_project_id,
         )
@@ -203,6 +230,7 @@ def start_pending_form_prompt(
     response_window: int = 600,
     responder_users: list[str] | None = None,
     responder_groups: list[str] | None = None,
+    consumer_code: str = 'echo "submitted path executed"',
 ) -> tuple[UUID, FormPromptListRead]:
     """Start a workflow and wait until its form prompt is pending."""
     exec_id = create_form_prompt_execution(
@@ -218,6 +246,7 @@ def start_pending_form_prompt(
         response_window=response_window,
         responder_users=responder_users,
         responder_groups=responder_groups,
+        consumer_code=consumer_code,
     )
     prompt = poll_for_pending_form_prompt(syntara_api, exec_id, timeout=PROMPT_POLL_TIMEOUT)
     return exec_id, prompt

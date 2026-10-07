@@ -38,11 +38,12 @@ def producer_prompt_consumer_workflow(
     response_window: int = 600,
     responder_users: list[str] | None = None,
     responder_groups: list[str] | None = None,
+    consumer_code: str = 'echo "submitted path executed"',
 ) -> WorkflowDefinition:
     """Build a trigger, Python producer, form prompt, and downstream consumer.
 
     Optional responder lists restrict which users or group members may submit
-    the form prompt.
+    the form prompt. ``consumer_code`` can inspect the prompt response.
     """
     payload = json.dumps(producer_output)
     prompt_parameters: dict[str, Any] = {
@@ -73,7 +74,7 @@ def producer_prompt_consumer_workflow(
             "id": "consumer",
             "name": "Consumer Node",
             "type": "script",
-            "parameters": {"language": "bash", "code": 'echo "submitted path executed"'},
+            "parameters": {"language": "bash", "code": consumer_code},
         },
     ]
     edges: list[dict[str, Any]] = [
